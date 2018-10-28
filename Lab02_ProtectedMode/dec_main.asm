@@ -255,12 +255,12 @@ print_symbol:
 			add ebx,2			   
 			mov out_position,ebx
 leav:
-			
+			; Reenabling keyboard processing
 			in	al,61h
 			or	al,80h
 			out	61h,al
 
-			
+			; EOI
 			mov	al,20h
 			out	20h,al
 
