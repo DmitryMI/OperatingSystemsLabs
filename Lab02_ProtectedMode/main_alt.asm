@@ -14,7 +14,7 @@ int_descr ends
 PM_seg	SEGMENT PARA PUBLIC 'CODE' USE32		
 												
 										        
-	                ASSUME	CS:PM_seg
+	ASSUME	CS:PM_seg
 
   	GDT		label	byte
 
