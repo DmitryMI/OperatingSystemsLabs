@@ -248,13 +248,12 @@ print_symbol:
 			mov ebx,out_position   
 			mov es:[ebp+ebx],dl
 
-			add ebx,2			   
-			mov out_position,ebx
-			
 			pop ax
 			cmp al, 0Eh ; Comparing with backspace again
-			jne leav			
-			sub out_position, 2
+			je leav
+			
+			add ebx,2			   
+			mov out_position,ebx
 leav:
 			
 			in	al,61h
