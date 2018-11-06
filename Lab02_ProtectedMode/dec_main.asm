@@ -2,20 +2,20 @@
 
 
 descr struc     
-	lim 	dw 0	
-	base_l 	dw 0	
-	base_m 	db 0	
-	attr_1	db 0	
+	lim 	dw 0				; Limit of segment
+	base_l 	dw 0				; Low base part
+	base_m 	db 0				; Middle base part
+	attr_1	db 0				
 	attr_2	db 0	
-	base_h 	db 0	
+	base_h 	db 0				; High base part
 descr ends
 
 int_descr struc 
-	offs_l 	dw 0 	
-	sel			dw 0	
-	counter db 0  
-	attr		db 0  
-	offs_h 	dw 0  
+	offs_l 	dw 0 				; Low offset part
+	sel		dw 0				; Segment selector that contains int. handler
+	counter db 0  				; Not in use
+	attr	db 0  
+	offs_h 	dw 0  				; High offset part
 int_descr ends
 
 
@@ -31,6 +31,7 @@ PM_seg	SEGMENT PARA PUBLIC 'CODE' USE32
   	gdt_null	descr <>
 
   	
+	; This segment has granularity bit setted
   	gdt_flatDS	descr <0FFFFh,0,0,92h,11001111b,0>	
 
   	
@@ -70,18 +71,18 @@ PM_seg	SEGMENT PARA PUBLIC 'CODE' USE32
 
     idt_size = $-IDT 
 
-    idtr	df 0 
+    idtr		df 0 
 
-    idtr_real dw	3FFh,0,0 
+    idtr_real 	dw	3FFh,0,0 
 
-    master	db 0					 
+    master		db 0					 
     slave		db 0					 
 
     escape		db 0				 
     time_08		dd 0				 
 
-		msg1 db 'We are in Real Mode now. To move to Protected Mode press any key...$'
-		msg2 db 'In Real Mode again!$'
+	msg1 		db 'We are in Real Mode now. To move to Protected Mode press any key...$'
+	msg2 		db 'In Real Mode again!$'
 
 		
 		
@@ -90,15 +91,6 @@ PM_seg	SEGMENT PARA PUBLIC 'CODE' USE32
 					db 68, 70, 71, 72, 74, 75, 76, 59, 39, 96, 0, 92, 90, 88, 67
 					db 86, 66, 78, 77, 44, 46, 47
 		out_position	dd 1E0h 
-
-
-
-
-print_str macro str
-		mov ah,9
-		mov dx, str
-		int 21h
-endm
 
 
 		
@@ -114,9 +106,8 @@ print_eax macro
 	add ebp, 0B8010h
 	
 	push eax
-	;push dx
 	
-	; Pushing stop-symbol
+							; Pushing stop-symbol
 	mov edx, 'x'
 	push edx
 	
@@ -125,8 +116,8 @@ next1:
 	
 	mov edx, 0
 	mov ecx, 10
-	div ecx ; eax = eax / ecx; edx = R(eax / ecx)
-	push edx ; Pushing remainder
+	div ecx 				; eax = eax / ecx; edx = R(eax / ecx)
+	push edx 				; Pushing remainder
 	cmp eax, 0
 	jne next1
 	
@@ -151,7 +142,7 @@ endm
 PM_entry:
 		
 		
-		mov	ax,SEL_32bitDS
+		mov	ax,SEL_32bitDS			; Loading preprocessed selectors
 		mov	ds,ax
 		mov	ax,SEL_flatDS
 		mov	es,ax
@@ -161,26 +152,25 @@ PM_entry:
 		mov	esp,ebx
 
 		
-		sti 
+		sti 						; Now we can enable maskable int-s
 
 		
 		call	compute_memory
 
 		
 		
-work:
+work:								; Infinite loop, waiting for int-s 8 or 9
 		test	escape, 1
 		jz	work
 
 goback:
+									; Returning to RM
 		
-		
-		cli 
+		cli 						; Disabling maskable int-s
 
 		
-		db	0EAh 
-		
-		dd	offset RM_return
+		db	0EAh 					; far jump to PM_return		
+		dd	offset RM_return		; It is placed in 16-bit segment
 		dw	SEL_16bitCS
 
 
@@ -221,19 +211,19 @@ new_int09: ;; SCAN CODES: http://www.ee.bgu.ac.il/~microlab/MicroLab/Labs/ScanCo
 			push ebp
 			push edx
 
-			in	al,60h ; Reading scan-code from keyboard 
+			in	al,60h 		; Reading scan-code from keyboard 
 
-			cmp	al,1Ch ; Comparison with ENTER	     
+			cmp	al,1Ch 		; Comparison with ENTER	     
 			jne	not_leave 	 
 			mov escape,1     
 			jmp leav
 not_leave:
-			cmp al,80h 	; Comparing: if button was pressed or released
-			ja leav 	; Released - leaving
+			cmp al,80h 		; Comparing: if button was pressed or released
+			ja leav 		; Released - leaving
 			
 			push ax
 			
-			cmp al, 0Eh ; Comparing with backspace
+			cmp al, 0Eh 	; Comparing with backspace
 			jne print_symbol
 			
 			sub out_position, 2
@@ -254,6 +244,7 @@ print_symbol:
 			
 			add ebx,2			   
 			mov out_position,ebx
+			
 leav:
 			; Reenabling keyboard processing
 			in	al,61h
@@ -351,24 +342,24 @@ start:
 		pop eax
 
 		
-		mov	ax,3
+		mov	ax,3									; Clear screen
 		int	10h
 
 		
-		push PM_seg
-		pop ds
+		push PM_seg									; Setting shadow register
+		pop ds										; of DS
 
 		
-		xor	eax,eax
+		xor	eax,eax									; Base address calculation
 		mov	ax,RM_seg
-		shl	eax,4		
+		shl	eax,4									; PARA Alignment		
 		mov	word ptr gdt_16bitCS.base_l,ax
 		shr	eax,16
 		mov	byte ptr gdt_16bitCS.base_m,al
 		mov	ax,PM_seg
 		shl	eax,4
-		push eax		
-		push eax		
+		push eax									; For IDT address		
+		push eax									; For GDT address
 		mov	word ptr GDT_32bitCS.base_l,ax
 		mov	word ptr GDT_32bitSS.base_l,ax
 		mov	word ptr GDT_32bitDS.base_l,ax
@@ -378,21 +369,22 @@ start:
 		mov	byte ptr GDT_32bitDS.base_m,al
 
 		
-		pop eax
-		add	eax,offset GDT 						
-		
-		mov	dword ptr gdtr+2,eax			
-		mov word ptr gdtr, gdt_size-1	
+		pop eax										; Calculating GDT linear
+		add	eax,offset GDT 							; EAX = Full GDT linear address			
+													; In real mode all addresses are virtual
+		mov	dword ptr gdtr+2,eax					; Low bytes = linear address	
+		mov word ptr gdtr, gdt_size-1				; Hight bytes = gdt size - 1
 		
 		lgdt	fword ptr gdtr
 
+													; Same for IDT
 		
 		pop	eax
 		add	eax,offset IDT
 		mov	dword ptr idtr+2,eax
 		mov word ptr idtr, idt_size-1
 
-		
+													; Calculating offsets
 		mov	eax, offset new_int08 
 		mov	int08.offs_l, ax
 		shr	eax, 16
@@ -402,57 +394,57 @@ start:
 		shr	eax, 16
 		mov	int09.offs_h, ax
 
-		
+													; Saving int. masks
 		in	al, 21h							
 		mov	master, al					
 		in	al, 0A1h						
 		mov	slave, al
 
-		
-		mov	al, 11h							
-		out	20h, al							
-		mov	AL, 20h							
-		out	21h, al							
-		mov	al, 4								
-														
+													; Programming master PIC
+		mov	al, 11h									; CMD "Init master"
+		out	20h, al									; PORT 20h "On/Off"			
+		mov	al, 20h									; Base vector = 32 (dec.)			
+		out	21h, al									; CMD "Set base vector"					
+				
+													
+		mov	al, 4
 		out	21h, al
-		mov	al, 1							  
-		out	21h, al
-
 		
-		mov	al, 0FCh
+		mov	al, 1									; CMD "Need to send EOI"		  
 		out	21h, al
 
 		
+		mov	al, 0FCh								; Disabling all IRQs, except IRQ0 and IRQ1
+		out	21h, al									; on master
 		
-		mov	al, 0FFh
-		out	0A1h, al
+		
+		mov	al, 0FFh								; Disabling all IRQs
+		out	0A1h, al								; on slave
 
 		
 		lidt	fword ptr idtr
 
 		
-		
+													; Opening line A20
 		in	al,92h						
 		or	al,2							
-		out	92h,al						
-
+		out	92h,al		
 		
 		
-		
-		cli
-		
+		cli											; Disabling maskable int-s
+								
+													; Disabling unmaskable int-s
 		in	al,70h
 		or	al,80h
 		out	70h,al
 
-		
-		mov	eax,cr0
+													; Modificating CR0
+		mov	eax,cr0									; to enter PM
 		or	al,1
 		mov	cr0,eax
 
 		
-		db	66h
+		db	66h										; Jumping to PM_entry
 		db	0EAh
 		dd	offset PM_entry
 		dw	SEL_32bitCS
@@ -461,18 +453,19 @@ start:
 		
 
 RM_return:
-		
+								; Reentering RM
 		mov	eax,cr0
-		and	al,0FEh 				
+		and	al,0FEh 			; Clearing PM flag
 		mov	cr0,eax
 
-		
+								; Assembler restricts access to CS
 		db	0EAh						
-		dw	$+4							
+		dw	$+4					; Jumping forward		
 		dw	RM_seg
 
-		
-		mov	ax,PM_seg				
+								; Jump target
+								; Restoring registers for working in RM
+		mov	ax,PM_seg		
 		mov	ds,ax
 		mov	es,ax
 		mov	ax,stack_seg
@@ -480,17 +473,17 @@ RM_return:
 		mov	ss,ax
 		mov	sp,bx
 
-		
-		mov	al, 11h					
+								; Reprogramming master PIC to vector 8
+		mov	al, 11h				; INIT		
 		out	20h, al
-		mov	al, 8						
+		mov	al, 8				; Vector	
 		out	21h, al
 		mov	al, 4						
 		out	21h, al
 		mov	al, 1
 		out	21h, al
 
-		
+								; Restoring controller masks
 		mov	al, master
 		out	21h, al
 		mov	al, slave
@@ -499,25 +492,25 @@ RM_return:
 		
 		lidt	fword ptr idtr_real
 
-		
+								; Reenabling unmaskable int-s
 		in	al,70h
 		and	al,07FH
 		out	70h,al
 
     
-		sti
+		sti						; Reenabling maskable int-s
 
 		
-		mov	ax,3
+		mov	ax,3				; Clear screen
 		int	10h
 
-		
+								; Printing message
 		mov ah, 09h
 		mov edx, offset msg2
 		int 21h
 
 
-		
+								; Terminating process
 		mov	ah,4Ch
 		int	21h
 
