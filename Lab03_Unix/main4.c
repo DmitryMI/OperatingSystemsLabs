@@ -14,6 +14,8 @@ void analise_status_mult(int wait_status, int child_pid)
 
 int main(void)
 {
+	printf("Programm 4. Pipe\n");
+
 	int childPid1, childPid2;
 		
 	// fd[0] is open for reading
@@ -38,8 +40,10 @@ int main(void)
 	{
 		childPid2 = fork();
 		if(childPid2 == -1)
+		{
 			perror("Fork 2 failed!");
-		exit(1);
+			exit(1);
+		}
 	}
 	
 	if(childPid1 != 0 && childPid2 != 0)
